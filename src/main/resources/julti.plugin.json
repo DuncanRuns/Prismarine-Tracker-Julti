@@ -1,0 +1,6 @@
+{
+  "name": "Julti Example Plugin",
+  "id": "julti-example-plugin",
+  "version": "${version}",
+  "initializer": "xyz.duncanruns.julti.exampleplugin.ExamplePlugin"
+}
