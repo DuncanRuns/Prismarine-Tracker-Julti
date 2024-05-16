@@ -20,9 +20,10 @@ public class PrismarineTracker {
     private static PlaySession session = new PlaySession();
     private static final HashMap<Path, Integer> LAST_WORLD_MAP = new HashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static int cycle = 0;
     private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
+    private static long lastActivity = System.currentTimeMillis();
+    private static long lastTick = 0;
 
     public static void init() {
         if (!Files.isDirectory(FOLDER_PATH)) {
@@ -36,21 +37,26 @@ public class PrismarineTracker {
             try {
                 s = FileUtil.readString(SESSION_PATH);
                 PlaySession lastSession = GSON.fromJson(s, PlaySession.class);
-                if (System.currentTimeMillis() - lastSession.sessionEndTime < 300_000) {
-                    session = lastSession;
+                long timeSinceLastSessionEnd = System.currentTimeMillis() - lastSession.sessionEndTime;
+                if (timeSinceLastSessionEnd < 300_000) {
                     Julti.log(Level.WARN, "(Prismarine Tracker) Last session was less than 5 minutes ago so it will be continued.");
+                    session = lastSession;
+                    session.breaks.add(timeSinceLastSessionEnd);
                 }
             } catch (IOException | JsonSyntaxException | NullPointerException e) {
                 Julti.log(Level.WARN, "(Prismarine Tracker) Last session couldn't be recovered, so a new one will be started");
             }
         }
 
-        tick();
         PluginEvents.RunnableEventType.END_TICK.register(() -> {
-            if (++cycle > 4000) {
-                cycle = 0;
+            if (System.currentTimeMillis() - lastTick > 5000) {
+                lastTick = System.currentTimeMillis();
                 tick();
             }
+        });
+
+        PluginEvents.InstanceEventType.RESET.register(o -> {
+            updateLastActivity();
         });
     }
 
@@ -97,7 +103,7 @@ public class PrismarineTracker {
 
         for (JsonElement event : json.get("timelines").getAsJsonArray()) {
             JsonObject eventJson = event.getAsJsonObject();
-            if (hasOpenedToLan && eventJson.get("rta").getAsLong() < openToLanTime) {
+            if (hasOpenedToLan && eventJson.get("rta").getAsLong() > openToLanTime) {
                 continue;
             }
             timeLineEvents.put(eventJson.get("name").getAsString(), eventJson.get("igt").getAsLong());
@@ -195,6 +201,20 @@ public class PrismarineTracker {
                 Julti.log(Level.ERROR, "(Prismarine Tracker) Failed to process an instance! " + ExceptionUtil.toDetailedString(e));
             }
         }
+
+        if (InstanceManager.getInstanceManager().getSelectedInstance() != null) {
+            // Playing
+            updateLastActivity();
+        }
+    }
+
+    private static synchronized void updateLastActivity() {
+        long currentTime = System.currentTimeMillis();
+        long timeSinceLastActivity = Math.abs(currentTime - lastActivity);
+        if (timeSinceLastActivity > 300_000) {
+            session.breaks.add(timeSinceLastActivity);
+        }
+        lastActivity = currentTime;
     }
 
     private static List<Path> getAllInstancePaths() {
