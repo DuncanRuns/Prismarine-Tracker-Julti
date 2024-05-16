@@ -24,6 +24,8 @@ public class PrismarineTracker {
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
     private static long lastActivity = System.currentTimeMillis();
     private static long lastTick = 0;
+    private static boolean benchmarkWasRunning = false;
+    private static boolean shouldSave = false;
 
     public static void init() {
         if (!Files.isDirectory(FOLDER_PATH)) {
@@ -48,28 +50,28 @@ public class PrismarineTracker {
             }
         }
 
-        PluginEvents.RunnableEventType.END_TICK.register(() -> {
-            if (System.currentTimeMillis() - lastTick > 5000) {
-                lastTick = System.currentTimeMillis();
-                tick();
-            }
-        });
-
-        PluginEvents.InstanceEventType.RESET.register(o -> {
-            updateLastActivity();
-        });
+        PluginEvents.RunnableEventType.END_TICK.register(PrismarineTracker::tick);
+        PluginEvents.InstanceEventType.RESET.register(o -> updateLastActivity());
     }
 
     public static void stop() {
         tick();
-        session.sessionEndTime = System.currentTimeMillis();
+        trySave();
+    }
+
+    private static void trySave() {
         try {
-            String toWrite = GSON.toJson(session);
-            FileUtil.writeString(SESSION_PATH, toWrite);
-            FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
+            save();
         } catch (IOException e) {
             Julti.log(Level.ERROR, "(Prismarine Tracker) Failed to save session: " + ExceptionUtil.toDetailedString(e));
         }
+    }
+
+    private static void save() throws IOException {
+        session.sessionEndTime = System.currentTimeMillis();
+        String toWrite = GSON.toJson(session);
+        FileUtil.writeString(SESSION_PATH, toWrite);
+        FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
     }
 
     private static void processWorld(Path worldPath) throws IOException, JsonSyntaxException {
@@ -77,6 +79,7 @@ public class PrismarineTracker {
         if (!Files.exists(recordPath)) {
             return;
         }
+
         JsonObject json = GSON.fromJson(FileUtil.readString(recordPath), JsonObject.class);
 
         // If non-survival, cheats, or coop, don't track
@@ -167,6 +170,7 @@ public class PrismarineTracker {
     private static void countRunsWithStuffStats(Map<String, Long> timeLineEvents) {
         if (!timeLineEvents.containsKey("pick_gold_block")) return;
         session.runsWithGold++;
+        shouldSave = true;
 
         if (!timeLineEvents.containsKey("found_villager")) return;
         session.runsWithVillage++;
@@ -192,7 +196,19 @@ public class PrismarineTracker {
     }
 
     private static void tick() {
+        if (System.currentTimeMillis() - lastTick > 5000) {
+            lastTick = System.currentTimeMillis();
+        } else {
+            return;
+        }
         List<Path> instancePaths = getAllInstancePaths();
+
+        boolean benchmarkIsRunning = JultiOptions.getJultiOptions().resetStyle.equals("Benchmark");
+        if (benchmarkIsRunning || benchmarkWasRunning) {
+            instancePaths.forEach(PrismarineTracker::skipToLastAttempt);
+            benchmarkWasRunning = benchmarkIsRunning;
+            return;
+        }
 
         for (Path instancePath : instancePaths) {
             try {
@@ -205,6 +221,11 @@ public class PrismarineTracker {
         if (InstanceManager.getInstanceManager().getSelectedInstance() != null) {
             // Playing
             updateLastActivity();
+        }
+
+        if (shouldSave) {
+            shouldSave = false;
+            trySave();
         }
     }
 
@@ -236,12 +257,12 @@ public class PrismarineTracker {
         }
         int lastCheckedWorld = LAST_WORLD_MAP.getOrDefault(instancePath, -1);
 
-        int attempts = extractAttempts(instancePath);
         if (lastCheckedWorld == -1) {
-            LAST_WORLD_MAP.put(instancePath, attempts == -1 ? -1 : attempts - 1);
+            skipToLastAttempt(instancePath);
             return;
         }
 
+        int attempts = extractAttempts(instancePath);
         int scanGoal = attempts - 1;
         for (int i = lastCheckedWorld + 1; i <= scanGoal; i++) {
             Path worldPath = savesPath.resolve("Random Speedrun #" + i);
@@ -252,6 +273,11 @@ public class PrismarineTracker {
             }
         }
         LAST_WORLD_MAP.put(instancePath, Math.max(scanGoal, lastCheckedWorld));
+    }
+
+    private static void skipToLastAttempt(Path instancePath) {
+        int attempts = extractAttempts(instancePath);
+        LAST_WORLD_MAP.put(instancePath, attempts == -1 ? -1 : attempts - 1);
     }
 
     private static int extractAttempts(Path instancePath) {
@@ -271,6 +297,14 @@ public class PrismarineTracker {
             }
         }
         return -1;
+    }
+
+    public static void clearSession() throws IOException {
+        Path potentialPath = FOLDER_PATH.resolve(session.sessionStartTime + ".json");
+        Files.deleteIfExists(potentialPath);
+        session = new PlaySession();
+        getAllInstancePaths().forEach(PrismarineTracker::skipToLastAttempt);
+        save();
     }
 
     static class PlaySession {
