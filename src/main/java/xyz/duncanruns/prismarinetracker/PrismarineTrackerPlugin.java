@@ -20,7 +20,7 @@ public class PrismarineTrackerPlugin implements PluginInitializer {
 
     @Override
     public void initialize() {
-        PrismarineTracker.load();
+        PrismarineTracker.init();
         PluginEvents.RunnableEventType.STOP.register(PrismarineTracker::stop);
         Julti.log(Level.INFO, "Prismarine Tracker Initialized");
     }

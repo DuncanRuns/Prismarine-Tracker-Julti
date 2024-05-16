@@ -3,6 +3,7 @@ package xyz.duncanruns.prismarinetracker;
 import com.google.gson.*;
 import org.apache.logging.log4j.Level;
 import xyz.duncanruns.julti.Julti;
+import xyz.duncanruns.julti.JultiOptions;
 import xyz.duncanruns.julti.instance.MinecraftInstance;
 import xyz.duncanruns.julti.management.InstanceManager;
 import xyz.duncanruns.julti.plugin.PluginEvents;
@@ -17,12 +18,33 @@ import java.util.stream.Collectors;
 
 public class PrismarineTracker {
     private static final HashMap<Path, Integer> LAST_WORLD_MAP = new HashMap<>();
-    private static final PlaySessionStats STATS = new PlaySessionStats();
+    private static PlaySession session = new PlaySession();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static int cycle = 0;
+    private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
+    private static final Path SESSION_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker").resolve("session.json");
 
-    public static void load() {
-        // TODO: check if continue session
+    public static void init() {
+        if (!Files.isDirectory(FOLDER_PATH)) {
+            try {
+                Files.createDirectory(FOLDER_PATH);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else if (Files.exists(SESSION_PATH)) {
+            String s;
+            try {
+                s = FileUtil.readString(SESSION_PATH);
+                PlaySession lastSession = GSON.fromJson(s, PlaySession.class);
+                if (System.currentTimeMillis() - lastSession.sessionEndTime < 300_000) {
+                    session = lastSession;
+                    Julti.log(Level.WARN, "(Prismarine Tracker) Last session was less than 5 minutes ago so it will be continued.");
+                }
+            } catch (IOException | JsonSyntaxException | NullPointerException e) {
+                Julti.log(Level.WARN, "(Prismarine Tracker) Last session couldn't be recovered, so a new one will be started");
+            }
+        }
+
         tick();
         PluginEvents.RunnableEventType.END_TICK.register(() -> {
             if (++cycle > 100) {
@@ -34,7 +56,14 @@ public class PrismarineTracker {
 
     public static void stop() {
         tick();
-        // Todo: Save tracked stats and also write the output
+        session.sessionEndTime = System.currentTimeMillis();
+        try {
+            String toWrite = GSON.toJson(session);
+            FileUtil.writeString(SESSION_PATH, toWrite);
+            FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
+        } catch (IOException e) {
+            Julti.log(Level.ERROR, "(Prismarine Tracker) Failed to save session: " + ExceptionUtil.toDetailedString(e));
+        }
     }
 
     private static void processWorld(Path worldPath) throws IOException, JsonSyntaxException {
@@ -49,7 +78,7 @@ public class PrismarineTracker {
         if (json.get("is_cheat_allowed").getAsBoolean()) return;
         if (json.get("is_coop").getAsBoolean()) return;
 
-        STATS.resets++;
+        session.resets++;
 
         long openToLanTime = 0;
         boolean hasOpenedToLan = false;
@@ -60,8 +89,8 @@ public class PrismarineTracker {
         }
 
         if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
-            STATS.runsFinished++;
-            STATS.runFinishTimes.add(json.get("retimed_igt").getAsLong());
+            session.runsFinished++;
+            session.runFinishTimes.add(json.get("retimed_igt").getAsLong());
         }
 
         Map<String, Long> timeLineEvents = new HashMap<>();
@@ -78,9 +107,9 @@ public class PrismarineTracker {
 
         // Count stronghold and end
         if (timeLineEvents.containsKey("enter_stronghold")) {
-            STATS.strongholdEnterTimes.add(timeLineEvents.get("enter_stronghold"));
+            session.strongholdEnterTimes.add(timeLineEvents.get("enter_stronghold"));
             if (timeLineEvents.containsKey("enter_end")) {
-                STATS.endEnterTimes.add(timeLineEvents.get("enter_end"));
+                session.endEnterTimes.add(timeLineEvents.get("enter_end"));
             }
         }
 
@@ -90,44 +119,70 @@ public class PrismarineTracker {
         }
         if (!isRegularInsomniac) return;
 
-        STATS.goldBlockPickupTimes.add(timeLineEvents.get("pick_gold_block"));
+        countRunsWithPearlsStat(json);
+
+        session.goldBlockPickupTimes.add(timeLineEvents.get("pick_gold_block"));
 
         if (!timeLineEvents.containsKey("found_villager")) return;
-        STATS.villageEnterTimes.add(timeLineEvents.get("found_villager"));
+        session.villageEnterTimes.add(timeLineEvents.get("found_villager"));
 
         if (!timeLineEvents.containsKey("enter_nether")) return;
-        STATS.netherEnterTimes.add(timeLineEvents.get("enter_nether"));
+        session.netherEnterTimes.add(timeLineEvents.get("enter_nether"));
 
         if (!timeLineEvents.containsKey("enter_fortress")) return;
-        STATS.fortressEnterTimes.add(timeLineEvents.get("enter_fortress"));
+        session.fortressEnterTimes.add(timeLineEvents.get("enter_fortress"));
 
         if (!timeLineEvents.containsKey("nether_travel")) return;
-        STATS.netherExitTimes.add(timeLineEvents.get("nether_travel"));
+        session.netherExitTimes.add(timeLineEvents.get("nether_travel"));
 
+    }
+
+    private static void countRunsWithPearlsStat(JsonObject json) {
+        if (!json.has("stats")) return;
+        JsonObject exploringJson = json.getAsJsonObject("stats");
+        Optional<String> uuid = exploringJson.keySet().stream().findAny();
+
+        if (!uuid.isPresent()) return;
+        exploringJson = exploringJson.getAsJsonObject(uuid.get());
+
+        if (!exploringJson.has("stats")) return;
+        exploringJson = exploringJson.getAsJsonObject("stats");
+
+        if (!exploringJson.has("minecraft:crafted")) return;
+        exploringJson = exploringJson.getAsJsonObject("minecraft:crafted");
+
+        if (!exploringJson.has("minecraft:ender_pearl")) return;
+        int pearls = exploringJson.get("minecraft:ender_pearl").getAsInt();
+        if (pearls >= 10) {
+            session.runsWith10Pearls++;
+        }
     }
 
     private static void countRunsWithStuffStats(Map<String, Long> timeLineEvents) {
         if (!timeLineEvents.containsKey("pick_gold_block")) return;
-        STATS.runsWithGold++;
+        session.runsWithGold++;
+
+        if (!timeLineEvents.containsKey("found_villager")) return;
+        session.runsWithVillage++;
 
         if (!timeLineEvents.containsKey("trade_with_villager")) return;
-        STATS.runsWithTrading++;
+        session.runsWithTrading++;
 
         if (!timeLineEvents.containsKey("enter_nether")) return;
-        STATS.runsWithNether++;
+        session.runsWithNether++;
 
         if (!timeLineEvents.containsKey("enter_fortress")) return;
-        STATS.runsWithFort++;
+        session.runsWithFort++;
 
         if ((!timeLineEvents.containsKey("nether_travel")) && (!timeLineEvents.containsKey("enter_stronghold")))
             return;
-        STATS.runsWithNetherExit++;
+        session.runsWithNetherExit++;
 
         if ((!timeLineEvents.containsKey("enter_stronghold"))) return;
-        STATS.runsWithStronghold++;
+        session.runsWithStronghold++;
 
         if ((!timeLineEvents.containsKey("enter_end"))) return;
-        STATS.runsWithEndEnter++;
+        session.runsWithEndEnter++;
     }
 
     private static void tick() {
@@ -198,19 +253,22 @@ public class PrismarineTracker {
         return -1;
     }
 
-    static class PlaySessionStats {
+    static class PlaySession {
         long sessionStartTime = System.currentTimeMillis();
-        int resets;
+        long sessionEndTime;
+        int resets = 0;
 
         // Amounts
-        int runsWithGold;
-        int runsWithTrading;
-        int runsWithNether;
-        int runsWithFort;
-        int runsWithNetherExit; // if nether_travel_home OR (enter_fortress and enter_stronghold)
-        int runsWithStronghold;
-        int runsWithEndEnter;
-        int runsFinished;
+        int runsWithGold = 0;
+        int runsWithVillage = 0;
+        int runsWithTrading = 0;
+        int runsWith10Pearls = 0;
+        int runsWithNether = 0;
+        int runsWithFort = 0;
+        int runsWithNetherExit = 0;
+        int runsWithStronghold = 0;
+        int runsWithEndEnter = 0;
+        int runsFinished = 0;
 
         // Times
         // (Regular insomniac only - mine gold block comes before trading)
@@ -224,5 +282,7 @@ public class PrismarineTracker {
         List<Long> strongholdEnterTimes = new LinkedList<>();
         List<Long> endEnterTimes = new LinkedList<>();
         List<Long> runFinishTimes = new LinkedList<>();
+
+        List<Long> breaks = new LinkedList<>();
     }
 }
