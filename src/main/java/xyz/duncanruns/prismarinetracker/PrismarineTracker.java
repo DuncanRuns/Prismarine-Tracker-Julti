@@ -301,7 +301,9 @@ public class PrismarineTracker {
 
     public static void clearSession() throws IOException {
         Path potentialPath = FOLDER_PATH.resolve(session.sessionStartTime + ".json");
-        Files.deleteIfExists(potentialPath);
+        if (session.runsWithGold == 0) {
+            Files.deleteIfExists(potentialPath);
+        }
         session = new PlaySession();
         getAllInstancePaths().forEach(PrismarineTracker::skipToLastAttempt);
         save();
