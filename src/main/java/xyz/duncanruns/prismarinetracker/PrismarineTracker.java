@@ -17,12 +17,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class PrismarineTracker {
-    private static final HashMap<Path, Integer> LAST_WORLD_MAP = new HashMap<>();
     private static PlaySession session = new PlaySession();
+    private static final HashMap<Path, Integer> LAST_WORLD_MAP = new HashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static int cycle = 0;
     private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
-    private static final Path SESSION_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker").resolve("session.json");
+    private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
 
     public static void init() {
         if (!Files.isDirectory(FOLDER_PATH)) {
@@ -47,7 +47,7 @@ public class PrismarineTracker {
 
         tick();
         PluginEvents.RunnableEventType.END_TICK.register(() -> {
-            if (++cycle > 100) {
+            if (++cycle > 4000) {
                 cycle = 0;
                 tick();
             }
