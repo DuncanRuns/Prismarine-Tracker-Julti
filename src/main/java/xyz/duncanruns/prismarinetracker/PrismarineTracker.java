@@ -43,8 +43,7 @@ public class PrismarineTracker {
             try {
                 s = FileUtil.readString(SESSION_PATH);
                 PlaySession lastSession = GSON.fromJson(s, PlaySession.class);
-                long timeSinceLastSessionEnd = System.currentTimeMillis() - lastSession.sessionEndTime;
-                if (timeSinceLastSessionEnd < 300_000) {
+                if (lastSession.runsWithGold > 0 && (System.currentTimeMillis() - lastSession.sessionEndTime < 300_000)) {
                     Julti.log(Level.INFO, "(Prismarine Tracker) Last session was less than 5 minutes ago so it will be continued.");
                     session = lastSession;
                 }
