@@ -22,7 +22,6 @@ public class PrismarineTracker {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
-    private static long lastActivity = System.currentTimeMillis();
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
     private static boolean shouldSave = false;
@@ -43,7 +42,6 @@ public class PrismarineTracker {
                 if (timeSinceLastSessionEnd < 300_000) {
                     Julti.log(Level.INFO, "(Prismarine Tracker) Last session was less than 5 minutes ago so it will be continued.");
                     session = lastSession;
-                    session.breaks.add(timeSinceLastSessionEnd);
                 }
             } catch (IOException | JsonSyntaxException | NullPointerException e) {
                 Julti.log(Level.WARN, "(Prismarine Tracker) Last session couldn't be recovered, so a new one will be started");
@@ -68,6 +66,7 @@ public class PrismarineTracker {
     }
 
     private static void save() throws IOException {
+        session.sessionEndTime = System.currentTimeMillis();
         String toWrite = GSON.toJson(session);
         FileUtil.writeString(SESSION_PATH, toWrite);
         FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
@@ -230,12 +229,11 @@ public class PrismarineTracker {
 
     private static synchronized void updateLastActivity() {
         long currentTime = System.currentTimeMillis();
-        long timeSinceLastActivity = Math.abs(currentTime - lastActivity);
+        long timeSinceLastActivity = Math.abs(currentTime - session.lastActivity);
         if (timeSinceLastActivity > 120_000 /*2 Minutes*/) {
             session.breaks.add(timeSinceLastActivity);
         }
-        lastActivity = currentTime;
-        session.sessionEndTime = currentTime;
+        session.lastActivity = currentTime;
     }
 
     private static List<Path> getAllInstancePaths() {
@@ -312,6 +310,7 @@ public class PrismarineTracker {
     static class PlaySession {
         long sessionStartTime = System.currentTimeMillis();
         long sessionEndTime = sessionStartTime;
+        long lastActivity = sessionStartTime;
         int resets = 0;
 
         // Amounts
