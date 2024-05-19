@@ -1,6 +1,7 @@
 package xyz.duncanruns.prismarinetracker;
 
 import com.google.gson.*;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.Level;
 import xyz.duncanruns.julti.Julti;
 import xyz.duncanruns.julti.JultiOptions;
@@ -10,9 +11,11 @@ import xyz.duncanruns.julti.plugin.PluginEvents;
 import xyz.duncanruns.julti.util.ExceptionUtil;
 import xyz.duncanruns.julti.util.FileUtil;
 
+import java.awt.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,9 +25,11 @@ public class PrismarineTracker {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
+    public static final Set<String> ACTIVITY_KEYS = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset"));
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
     private static boolean shouldSave = false;
+    private static boolean startedPlaying = false;
 
     public static void init() {
         if (!Files.isDirectory(FOLDER_PATH)) {
@@ -49,7 +54,12 @@ public class PrismarineTracker {
         }
 
         PluginEvents.RunnableEventType.END_TICK.register(PrismarineTracker::tick);
-        PluginEvents.InstanceEventType.RESET.register(o -> updateLastActivity());
+        PluginEvents.MiscEventType.HOTKEY_PRESS.register(o -> {
+            if (ACTIVITY_KEYS.contains(((Pair<String, Point>) o).getLeft())) {
+                startedPlaying = true;
+                updateLastActivity();
+            }
+        });
     }
 
     public static void stop() {
@@ -228,6 +238,7 @@ public class PrismarineTracker {
     }
 
     private static synchronized void updateLastActivity() {
+        if (!startedPlaying) return;
         long currentTime = System.currentTimeMillis();
         long timeSinceLastActivity = Math.abs(currentTime - session.lastActivity);
         if (timeSinceLastActivity > 120_000 /*2 Minutes*/) {
