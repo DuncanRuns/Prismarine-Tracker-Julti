@@ -132,10 +132,8 @@ public class PrismarineTracker {
             }
         }
 
-        boolean isRegularInsomniac = timeLineEvents.containsKey("pick_gold_block") && !timeLineEvents.containsKey("found_villager");
-        if (!isRegularInsomniac) {
-            isRegularInsomniac = timeLineEvents.containsKey("pick_gold_block") && timeLineEvents.get("found_villager") > timeLineEvents.get("pick_gold_block");
-        }
+        boolean isRegularInsomniac = (timeLineEvents.containsKey("pick_gold_block") && !timeLineEvents.containsKey("found_villager"))
+                || (timeLineEvents.containsKey("pick_gold_block") && timeLineEvents.get("found_villager") > timeLineEvents.get("pick_gold_block"));
         if (!isRegularInsomniac) return;
 
         countRunsWithPearlsStat(json);
