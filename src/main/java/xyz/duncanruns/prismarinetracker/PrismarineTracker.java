@@ -68,7 +68,6 @@ public class PrismarineTracker {
     }
 
     private static void save() throws IOException {
-        session.sessionEndTime = System.currentTimeMillis();
         String toWrite = GSON.toJson(session);
         FileUtil.writeString(SESSION_PATH, toWrite);
         FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
@@ -236,6 +235,7 @@ public class PrismarineTracker {
             session.breaks.add(timeSinceLastActivity);
         }
         lastActivity = currentTime;
+        session.sessionEndTime = currentTime;
     }
 
     private static List<Path> getAllInstancePaths() {
@@ -311,7 +311,7 @@ public class PrismarineTracker {
 
     static class PlaySession {
         long sessionStartTime = System.currentTimeMillis();
-        long sessionEndTime;
+        long sessionEndTime = sessionStartTime;
         int resets = 0;
 
         // Amounts
