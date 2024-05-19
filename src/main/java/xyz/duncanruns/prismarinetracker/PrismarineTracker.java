@@ -64,7 +64,9 @@ public class PrismarineTracker {
 
     public static void stop() {
         tick();
-        trySave();
+        if(session.runsWithGold > 0) {
+            trySave();
+        }
     }
 
     private static void trySave() {
