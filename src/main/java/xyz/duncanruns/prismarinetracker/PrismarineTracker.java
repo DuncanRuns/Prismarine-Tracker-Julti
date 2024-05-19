@@ -231,7 +231,7 @@ public class PrismarineTracker {
     private static synchronized void updateLastActivity() {
         long currentTime = System.currentTimeMillis();
         long timeSinceLastActivity = Math.abs(currentTime - lastActivity);
-        if (timeSinceLastActivity > 300_000) {
+        if (timeSinceLastActivity > 120_000 /*2 Minutes*/) {
             session.breaks.add(timeSinceLastActivity);
         }
         lastActivity = currentTime;
