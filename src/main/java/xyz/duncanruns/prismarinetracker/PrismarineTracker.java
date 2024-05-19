@@ -25,7 +25,7 @@ public class PrismarineTracker {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
-    public static final Set<String> ACTIVITY_KEYS = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset"));
+    public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
     private static boolean shouldSave = false;
@@ -54,7 +54,8 @@ public class PrismarineTracker {
 
         PluginEvents.RunnableEventType.END_TICK.register(PrismarineTracker::tick);
         PluginEvents.MiscEventType.HOTKEY_PRESS.register(o -> {
-            if (ACTIVITY_KEYS.contains(((Pair<String, Point>) o).getLeft())) {
+            String hotkeyCode = ((Pair<String, Point>) o).getLeft();
+            if (MANUAL_RESET_CODES.contains(hotkeyCode)) {
                 startedPlaying = true;
                 updateLastActivity();
             }
@@ -63,7 +64,7 @@ public class PrismarineTracker {
 
     public static void stop() {
         tick();
-        if(session.runsWithGold > 0) {
+        if (session.runsWithGold > 0) {
             trySave();
         }
     }
@@ -96,7 +97,7 @@ public class PrismarineTracker {
         if (json.get("is_cheat_allowed").getAsBoolean()) return;
         if (json.get("is_coop").getAsBoolean()) return;
 
-        session.resets++;
+        if (startedPlaying) session.resets++;
 
         long openToLanTime = 0;
         boolean hasOpenedToLan = false;
@@ -318,6 +319,7 @@ public class PrismarineTracker {
         Files.deleteIfExists(SESSION_PATH);
         session = new PlaySession();
         getAllInstancePaths().forEach(PrismarineTracker::skipToLastAttempt);
+        startedPlaying = false;
     }
 
     static class PlaySession {
