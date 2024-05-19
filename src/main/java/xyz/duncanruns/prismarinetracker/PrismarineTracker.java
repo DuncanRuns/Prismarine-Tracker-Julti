@@ -316,9 +316,9 @@ public class PrismarineTracker {
         if (session.runsWithGold == 0) {
             Files.deleteIfExists(potentialPath);
         }
+        Files.deleteIfExists(SESSION_PATH);
         session = new PlaySession();
         getAllInstancePaths().forEach(PrismarineTracker::skipToLastAttempt);
-        save();
     }
 
     static class PlaySession {
