@@ -227,7 +227,7 @@ public class PrismarineTracker {
         }
 
         MinecraftInstance selectedInstance;
-        if ((selectedInstance = InstanceManager.getInstanceManager().getSelectedInstance()) != null && selectedInstance.getVersionString().equals("1.15.2")) {
+        if ((selectedInstance = InstanceManager.getInstanceManager().getSelectedInstance()) != null && "1.15.2".equals(selectedInstance.getVersionString())) {
             // Playing
             updateLastActivity();
         }
