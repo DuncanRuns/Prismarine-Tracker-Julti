@@ -23,13 +23,20 @@ public class PrismarineTracker {
     private static PlaySession session = new PlaySession();
     private static final HashMap<Path, Integer> LAST_WORLD_MAP = new HashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
+    public static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
     public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
     private static boolean shouldSave = false;
     private static boolean startedPlaying = false;
+
+    /**
+     * Returned object should not be modified.
+     */
+    public static PlaySession getCurrentSession() {
+        return session;
+    }
 
     public static void init() {
         if (!Files.isDirectory(FOLDER_PATH)) {
@@ -320,37 +327,4 @@ public class PrismarineTracker {
         startedPlaying = false;
     }
 
-    static class PlaySession {
-        long sessionStartTime = System.currentTimeMillis();
-        long sessionEndTime = sessionStartTime;
-        long lastActivity = sessionStartTime;
-        int resets = 0;
-
-        // Amounts
-        int runsWithGold = 0;
-        int runsWithVillage = 0;
-        int runsWithTrading = 0;
-        int runsWith10Pearls = 0;
-        int runsWithNether = 0;
-        int runsWithFort = 0;
-        int runsWithNetherExit = 0;
-        int runsWithStronghold = 0;
-        int runsWithEndEnter = 0;
-        int runsFinished = 0;
-
-        // Times
-        // (Regular insomniac only - mine gold block comes before trading)
-        List<Long> goldBlockPickupTimes = new LinkedList<>();
-        List<Long> villageEnterTimes = new LinkedList<>();
-        List<Long> netherEnterTimes = new LinkedList<>();
-        List<Long> fortressEnterTimes = new LinkedList<>();
-        List<Long> netherExitTimes = new LinkedList<>();
-
-        // (For any runs)
-        List<Long> strongholdEnterTimes = new LinkedList<>();
-        List<Long> endEnterTimes = new LinkedList<>();
-        List<Long> runFinishTimes = new LinkedList<>();
-
-        List<Long> breaks = new LinkedList<>();
-    }
 }

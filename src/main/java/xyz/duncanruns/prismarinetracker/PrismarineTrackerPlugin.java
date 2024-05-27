@@ -9,6 +9,7 @@ import xyz.duncanruns.julti.plugin.PluginEvents;
 import xyz.duncanruns.julti.plugin.PluginInitializer;
 import xyz.duncanruns.julti.plugin.PluginManager;
 import xyz.duncanruns.prismarinetracker.command.PrismarineTrackerCommand;
+import xyz.duncanruns.prismarinetracker.gui.PrismarineTrackerGUI;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -30,11 +31,12 @@ public class PrismarineTrackerPlugin implements PluginInitializer {
     }
 
     @Override
-    public void onMenuButtonPress() {
+    public String getMenuButtonName() {
+        return "View Stats";
     }
 
     @Override
-    public boolean hasMenuButton() {
-        return false;
+    public void onMenuButtonPress() {
+        PrismarineTrackerGUI.open();
     }
 }
