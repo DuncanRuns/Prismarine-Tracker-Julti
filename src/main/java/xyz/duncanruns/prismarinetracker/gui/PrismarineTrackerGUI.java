@@ -73,6 +73,7 @@ public class PrismarineTrackerGUI extends JFrame {
         if (instance == null || instance.isClosed()) {
             instance = new PrismarineTrackerGUI();
         }
+        instance.requestFocus();
         return instance;
     }
 
