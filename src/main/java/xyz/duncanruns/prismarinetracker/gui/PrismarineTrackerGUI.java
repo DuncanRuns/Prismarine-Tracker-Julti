@@ -153,7 +153,7 @@ public class PrismarineTrackerGUI extends JFrame {
 
 
         if (session.runsFinished > 0) {
-            builder.append("\n\nEnds entered: ").append(session.runsFinished);
+            builder.append("\n\nRuns finished: ").append(session.runsFinished);
             if (!session.runFinishTimes.isEmpty()) {
                 builder.append(" (Average Time: ").append(FormattingUtil.formatSeconds(FormattingUtil.getAverageTime(session.runFinishTimes) / 1000)).append(")");
             }
