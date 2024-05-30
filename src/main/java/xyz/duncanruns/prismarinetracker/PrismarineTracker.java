@@ -97,14 +97,6 @@ public class PrismarineTracker {
         FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
     }
 
-//    private static void processWorld(Path worldPath) throws IOException, JsonSyntaxException {
-//        Path recordPath = worldPath.resolve("speedrunigt").resolve("record.json");
-//        if (!Files.exists(recordPath)) {
-//            return;
-//        }
-//        processJsonFile(recordPath);
-//    }
-
     private static void processJsonFile(Path recordPath) throws IOException {
         JsonObject json = GSON.fromJson(FileUtil.readString(recordPath), JsonObject.class);
         System.out.println("Processing " + recordPath);
@@ -276,63 +268,6 @@ public class PrismarineTracker {
         session.lastActivity = currentTime;
     }
 
-//    private static List<Path> getAllInstancePaths() {
-//        List<Path> instancePaths;
-//        instancePaths = new ArrayList<>(InstanceManager.getInstanceManager().getInstances())
-//                .stream()
-//                .filter(MinecraftInstance::hasWindow)
-//                .filter(instance -> "1.15.2".equals(instance.getVersionString()))
-//                .map(MinecraftInstance::getPath)
-//                .map(Path::toAbsolutePath)
-//                .collect(Collectors.toList());
-//        return instancePaths;
-//    }
-
-//    private static void processInstance(Path instancePath) throws IOException {
-//        Path savesPath = instancePath.resolve("saves");
-//        if (!Files.exists(savesPath)) {
-//            return;
-//        }
-//        int lastCheckedWorld = LAST_WORLD_MAP.getOrDefault(instancePath, -1);
-//
-//        if (lastCheckedWorld == -1) {
-//            skipToLastAttempt(instancePath);
-//            return;
-//        }
-//
-//        int attempts = extractAttempts(instancePath);
-//        int scanGoal = attempts - 1;
-//        for (int i = lastCheckedWorld + 1; i <= scanGoal; i++) {
-//            Path worldPath = savesPath.resolve("Random Speedrun #" + i);
-//            try {
-//                if (Files.exists(worldPath)) processWorld(worldPath);
-//            } catch (IOException | JsonSyntaxException | NullPointerException e) {
-//                Julti.log(Level.ERROR, "Failed to process a world: " + ExceptionUtil.toDetailedString(e));
-//            }
-//        }
-//        LAST_WORLD_MAP.put(instancePath, Math.max(scanGoal, lastCheckedWorld));
-//    }
-
-//    private static void skipToLastAttempt(Path instancePath) {
-//        int attempts = extractAttempts(instancePath);
-//        LAST_WORLD_MAP.put(instancePath, attempts == -1 ? -1 : attempts - 1);
-//    }
-
-//    private static int extractAttempts(Path instancePath) {
-//        String atumProp;
-//        try {
-//            atumProp = FileUtil.readString(instancePath.resolve("config").resolve("atum").resolve("atum.properties"));
-//        } catch (IOException e) {
-//            return -1;
-//        }
-//        Matcher matcher = Pattern.compile("rsgAttempts=(\\d+)").matcher(atumProp);
-//        if (!matcher.matches()) {
-//            return -1;
-//        } else {
-//            return Integer.parseInt(matcher.group(1));
-//        }
-//    }
-
     public static void clearSession() throws IOException {
         Path potentialPath = FOLDER_PATH.resolve(session.sessionStartTime + ".json");
         if (session.runsWithGold == 0) {
@@ -340,7 +275,7 @@ public class PrismarineTracker {
         }
         Files.deleteIfExists(SESSION_PATH);
         session = new PlaySession();
-//        getAllInstancePaths().forEach(PrismarineTracker::skipToLastAttempt);
+        clearWatcher();
         startedPlaying = false;
     }
 
