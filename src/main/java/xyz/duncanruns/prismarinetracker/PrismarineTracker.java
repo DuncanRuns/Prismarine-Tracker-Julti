@@ -22,6 +22,7 @@ public class PrismarineTracker {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
+    private static final Path RECORDS_FOLDER = Paths.get(System.getProperty("user.home")).resolve("speedrunigt").resolve("records");
     private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
     public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
     private static long lastTick = 0;
@@ -39,7 +40,7 @@ public class PrismarineTracker {
     public static void init() {
         try {
             recordsWatcher = FileSystems.getDefault().newWatchService();
-            Paths.get(System.getProperty("user.home")).resolve("speedrunigt").resolve("records").register(recordsWatcher, StandardWatchEventKinds.ENTRY_CREATE);
+            RECORDS_FOLDER.register(recordsWatcher, StandardWatchEventKinds.ENTRY_CREATE);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -106,6 +107,7 @@ public class PrismarineTracker {
 
     private static void processJsonFile(Path recordPath) throws IOException {
         JsonObject json = GSON.fromJson(FileUtil.readString(recordPath), JsonObject.class);
+        System.out.println("Processing " + recordPath);
         processJson(json);
     }
 
@@ -233,7 +235,6 @@ public class PrismarineTracker {
 
         MinecraftInstance selectedInstance;
         if ((selectedInstance = InstanceManager.getInstanceManager().getSelectedInstance()) != null && "1.15.2".equals(selectedInstance.getVersionString())) {
-            // Playing
             updateLastActivity();
         }
 
@@ -245,7 +246,7 @@ public class PrismarineTracker {
             if (event.kind() != StandardWatchEventKinds.ENTRY_CREATE || !(event.context() instanceof Path))
                 continue;
             try {
-                processJsonFile((Path) event.context());
+                processJsonFile(RECORDS_FOLDER.resolve((Path) event.context()));
             } catch (IOException | JsonSyntaxException | NullPointerException e) {
                 Julti.log(Level.ERROR, "Failed to process a world: " + ExceptionUtil.toDetailedString(e));
             }
@@ -259,8 +260,10 @@ public class PrismarineTracker {
     }
 
     private static void clearWatcher() {
-        WatchKey key;
-        while ((key = recordsWatcher.poll()) != null) key.reset();
+        WatchKey key = recordsWatcher.poll();
+        if (key == null) return;
+        key.pollEvents();
+        key.reset();
     }
 
     private static synchronized void updateLastActivity() {
