@@ -137,23 +137,34 @@ public class PrismarineTracker {
 
         countRunsWithStuffStats(timeLineEvents);
 
-        if (timeLineEvents.containsKey("trade_with_villager")) {
-            countRunsWithPearlsStat(json);
-        }
-
-        // Count stronghold and end
-        if (timeLineEvents.containsKey("enter_stronghold")) {
-            session.strongholdEnterTimes.add(timeLineEvents.get("enter_stronghold"));
-        }
         if (timeLineEvents.containsKey("enter_end")) {
             session.endEnterTimes.add(timeLineEvents.get("enter_end"));
         }
 
-        boolean isRegularInsomniac = (timeLineEvents.containsKey("pick_gold_block") && !timeLineEvents.containsKey("found_villager"))
-                || (timeLineEvents.containsKey("pick_gold_block") && timeLineEvents.get("found_villager") > timeLineEvents.get("pick_gold_block"));
-        if (!isRegularInsomniac) return;
+        if (!timeLineEvents.containsKey("pick_gold_block")) return;
+
+        if (timeLineEvents.containsKey("trade_with_villager")) {
+            countRunsWithPearlsStat(json);
+        }
+
+        if (timeLineEvents.containsKey("enter_stronghold") && timeLineEvents.containsKey("trade_with_villager")
+                && timeLineEvents.get("enter_stronghold") > timeLineEvents.get("trade_with_villager")
+                && timeLineEvents.get("enter_stronghold") > timeLineEvents.get("enter_nether")
+                && timeLineEvents.get("enter_stronghold") > timeLineEvents.get("pick_gold_block")
+        ) {
+            session.strongholdEnterTimes.add(timeLineEvents.get("enter_stronghold"));
+        }
+
+
+        // If there's a village enter, and it came before monument, it's not regular insomniac, don't count times for averages.
+        if (timeLineEvents.containsKey("found_villager") && timeLineEvents.get("found_villager") < timeLineEvents.get("pick_gold_block"))
+            return;
 
         session.goldBlockPickupTimes.add(timeLineEvents.get("pick_gold_block"));
+
+        // If there's a nether enter and a village enter, and the nether enter came before the village enter, don't count the rest of the times (Monument is still fine).
+        if (timeLineEvents.containsKey("found_villager") && timeLineEvents.containsKey("enter_nether") && timeLineEvents.get("enter_nether") < timeLineEvents.get("found_villager"))
+            return;
 
         if (!timeLineEvents.containsKey("found_villager")) return;
         session.villageEnterTimes.add(timeLineEvents.get("found_villager"));
@@ -191,17 +202,20 @@ public class PrismarineTracker {
 
     private static void countRunsWithStuffStats(Map<String, Long> timeLineEvents) {
         if ((timeLineEvents.containsKey("enter_end"))) session.runsWithEndEnter++;
+
         if (!timeLineEvents.containsKey("pick_gold_block")) return;
         session.runsWithGold++;
         shouldSave = true;
 
         if (timeLineEvents.containsKey("found_villager")) session.runsWithVillage++;
         if (timeLineEvents.containsKey("trade_with_villager")) session.runsWithTrading++;
-        if (timeLineEvents.containsKey("enter_nether")) session.runsWithNether++;
+        if (timeLineEvents.containsKey("enter_nether")) {
+            session.runsWithNether++;
+            if (timeLineEvents.containsKey("enter_stronghold")) session.runsWithStronghold++;
+        }
         if (timeLineEvents.containsKey("enter_fortress")) session.runsWithFort++;
         if (timeLineEvents.containsKey("nether_travel") || timeLineEvents.containsKey("enter_end"))
             session.runsWithNetherExit++;
-        if (timeLineEvents.containsKey("enter_stronghold")) session.runsWithStronghold++;
     }
 
     private static void tick() {
