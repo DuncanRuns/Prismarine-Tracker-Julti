@@ -190,19 +190,18 @@ public class PrismarineTracker {
     }
 
     private static void countRunsWithStuffStats(Map<String, Long> timeLineEvents) {
-        if (timeLineEvents.containsKey("pick_gold_block")) {
-            session.runsWithGold++;
-            // All of these things could feasibly be done on shit runs, even strongholds
-            if (timeLineEvents.containsKey("found_villager")) session.runsWithVillage++;
-            if (timeLineEvents.containsKey("trade_with_villager")) session.runsWithTrading++;
-            if (timeLineEvents.containsKey("enter_nether")) session.runsWithNether++;
-            if (timeLineEvents.containsKey("enter_fortress")) session.runsWithFort++;
-            if (timeLineEvents.containsKey("nether_travel") || timeLineEvents.containsKey("enter_end"))
-                session.runsWithNetherExit++;
-            if (timeLineEvents.containsKey("enter_stronghold")) session.runsWithStronghold++;
-            shouldSave = true;
-        }
         if ((timeLineEvents.containsKey("enter_end"))) session.runsWithEndEnter++;
+        if (!timeLineEvents.containsKey("pick_gold_block")) return;
+        session.runsWithGold++;
+        shouldSave = true;
+
+        if (timeLineEvents.containsKey("found_villager")) session.runsWithVillage++;
+        if (timeLineEvents.containsKey("trade_with_villager")) session.runsWithTrading++;
+        if (timeLineEvents.containsKey("enter_nether")) session.runsWithNether++;
+        if (timeLineEvents.containsKey("enter_fortress")) session.runsWithFort++;
+        if (timeLineEvents.containsKey("nether_travel") || timeLineEvents.containsKey("enter_end"))
+            session.runsWithNetherExit++;
+        if (timeLineEvents.containsKey("enter_stronghold")) session.runsWithStronghold++;
     }
 
     private static void tick() {
