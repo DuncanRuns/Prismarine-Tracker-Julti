@@ -107,10 +107,7 @@ public class PrismarineTracker {
         // If non-survival, cheats, or coop, or not random seed, don't track
         if (json.get("default_gamemode").getAsInt() != 0) return;
         if (!Objects.equals(json.get("run_type").getAsString(), "random_seed")) return;
-        if (json.get("is_cheat_allowed").getAsBoolean()) return;
         if (json.get("is_coop").getAsBoolean()) return;
-
-        if (startedPlaying) session.resets++;
 
         long openToLanTime = 0;
         boolean hasOpenedToLan = false;
@@ -119,6 +116,10 @@ public class PrismarineTracker {
             hasOpenedToLan = true;
         } catch (Exception ignored) {
         }
+
+        if (!hasOpenedToLan && json.get("is_cheat_allowed").getAsBoolean()) return; // is_cheat_allowed will be true when open to lan and coping
+
+        if (startedPlaying) session.resets++;
 
         if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
             session.runsFinished++;
