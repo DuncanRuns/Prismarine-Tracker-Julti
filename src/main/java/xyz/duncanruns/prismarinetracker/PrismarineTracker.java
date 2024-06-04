@@ -13,6 +13,7 @@ import xyz.duncanruns.julti.util.FileUtil;
 
 import java.awt.*;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -24,6 +25,7 @@ public class PrismarineTracker {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public static final Path TRACKER_DIR = JultiOptions.getJultiDir().resolve("prismarinetracker");
     public static final Path SESSIONS_DIR = TRACKER_DIR.resolve("sessions");
+    public static final Path OUTPUT_DIR = TRACKER_DIR.resolve("output");
     private static final Path SESSION_FILE_PATH = TRACKER_DIR.resolve("session.json");
     private static final Path RECORDS_FOLDER = Paths.get(System.getProperty("user.home")).resolve("speedrunigt").resolve("records");
     public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
@@ -73,6 +75,12 @@ public class PrismarineTracker {
             throw new RuntimeException(e);
         }
 
+        try {
+            saveOutputFiles();
+        } catch (IOException e) {
+            Julti.log(Level.ERROR, "(Prismarine Tracker) Failed to save output files: " + ExceptionUtil.toDetailedString(e));
+        }
+
         PluginEvents.RunnableEventType.END_TICK.register(PrismarineTracker::tick);
         PluginEvents.MiscEventType.HOTKEY_PRESS.register(o -> {
             String hotkeyCode = ((Pair<String, Point>) o).getLeft();
@@ -108,8 +116,25 @@ public class PrismarineTracker {
     private static void trySave() {
         try {
             save();
+            saveOutputFiles();
         } catch (IOException e) {
             Julti.log(Level.ERROR, "(Prismarine Tracker) Failed to save session: " + ExceptionUtil.toDetailedString(e));
+        }
+    }
+
+    private static void saveOutputFiles() throws IOException {
+        PlaySession.CalculatedStats cs = session.toCalculatedStats();
+
+        if (!Files.isDirectory(OUTPUT_DIR)) {
+            Files.createDirectories(OUTPUT_DIR);
+        }
+
+        for (Field f : cs.getClass().getDeclaredFields()) {
+            try {
+                FileUtil.writeString(OUTPUT_DIR.resolve(f.getName() + ".txt"), f.get(cs).toString());
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
