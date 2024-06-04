@@ -44,6 +44,10 @@ public final class FormattingUtil {
         return total / times.size();
     }
 
+    public static String formatMillis(long totalMillis) {
+        return formatSeconds(totalMillis / 1000);
+    }
+
     public static String formatSeconds(long totalSeconds) {
         long hours = totalSeconds / 3600;
         long minutes = (totalSeconds % 3600) / 60;

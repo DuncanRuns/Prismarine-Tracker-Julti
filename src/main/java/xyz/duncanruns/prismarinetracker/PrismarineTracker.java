@@ -15,15 +15,17 @@ import java.awt.*;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class PrismarineTracker {
     private static PlaySession session = new PlaySession();
     private static WatchService recordsWatcher = null;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    public static final Path FOLDER_PATH = JultiOptions.getJultiDir().resolve("prismarinetracker");
+    public static final Path TRACKER_DIR = JultiOptions.getJultiDir().resolve("prismarinetracker");
+    public static final Path SESSIONS_DIR = TRACKER_DIR.resolve("sessions");
+    private static final Path SESSION_FILE_PATH = TRACKER_DIR.resolve("session.json");
     private static final Path RECORDS_FOLDER = Paths.get(System.getProperty("user.home")).resolve("speedrunigt").resolve("records");
-    private static final Path SESSION_PATH = FOLDER_PATH.resolve("session.json");
     public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
@@ -45,16 +47,16 @@ public class PrismarineTracker {
             throw new RuntimeException(e);
         }
 
-        if (!Files.isDirectory(FOLDER_PATH)) {
+        if (!Files.isDirectory(SESSIONS_DIR)) {
             try {
-                Files.createDirectory(FOLDER_PATH);
+                Files.createDirectories(SESSIONS_DIR);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-        } else if (Files.exists(SESSION_PATH)) {
+        } else if (Files.exists(SESSION_FILE_PATH)) {
             String s;
             try {
-                s = FileUtil.readString(SESSION_PATH);
+                s = FileUtil.readString(SESSION_FILE_PATH);
                 PlaySession lastSession = GSON.fromJson(s, PlaySession.class);
                 if (lastSession.runsWithGold > 0 && (System.currentTimeMillis() - lastSession.sessionEndTime < 300_000)) {
                     Julti.log(Level.INFO, "(Prismarine Tracker) Last session was less than 5 minutes ago so it will be continued.");
@@ -65,6 +67,12 @@ public class PrismarineTracker {
             }
         }
 
+        try {
+            moveOldSessionFiles();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         PluginEvents.RunnableEventType.END_TICK.register(PrismarineTracker::tick);
         PluginEvents.MiscEventType.HOTKEY_PRESS.register(o -> {
             String hotkeyCode = ((Pair<String, Point>) o).getLeft();
@@ -73,6 +81,21 @@ public class PrismarineTracker {
                 updateLastActivity();
             }
         });
+    }
+
+    private static void moveOldSessionFiles() throws IOException {
+        Pattern sessionFilePattern = Pattern.compile("\\d+\\.json");
+        Files.list(TRACKER_DIR)
+                .map(p -> p.getFileName().toString())
+                .filter(s -> sessionFilePattern.matcher(s).matches())
+                .forEach(s -> {
+                    try {
+                        Files.move(TRACKER_DIR.resolve(s), SESSIONS_DIR.resolve(s));
+                        Julti.log(Level.INFO,"Session file "+s+" moved to new sessions folder.");
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     public static void stop() {
@@ -93,8 +116,8 @@ public class PrismarineTracker {
     private static void save() throws IOException {
         session.sessionEndTime = System.currentTimeMillis();
         String toWrite = GSON.toJson(session);
-        FileUtil.writeString(SESSION_PATH, toWrite);
-        FileUtil.writeString(FOLDER_PATH.resolve(session.sessionStartTime + ".json"), toWrite);
+        FileUtil.writeString(SESSION_FILE_PATH, toWrite);
+        FileUtil.writeString(SESSIONS_DIR.resolve(session.sessionStartTime + ".json"), toWrite);
     }
 
     private static void processJsonFile(Path recordPath) throws IOException {
@@ -117,7 +140,8 @@ public class PrismarineTracker {
         } catch (Exception ignored) {
         }
 
-        if (!hasOpenedToLan && json.get("is_cheat_allowed").getAsBoolean()) return; // is_cheat_allowed will be true when open to lan and coping
+        if (!hasOpenedToLan && json.get("is_cheat_allowed").getAsBoolean())
+            return; // is_cheat_allowed will be true when open to lan and coping
 
         if (startedPlaying) session.resets++;
 
@@ -277,11 +301,11 @@ public class PrismarineTracker {
     }
 
     public static void clearSession() throws IOException {
-        Path potentialPath = FOLDER_PATH.resolve(session.sessionStartTime + ".json");
+        Path potentialPath = SESSIONS_DIR.resolve(session.sessionStartTime + ".json");
         if (session.runsWithGold == 0) {
             Files.deleteIfExists(potentialPath);
         }
-        Files.deleteIfExists(SESSION_PATH);
+        Files.deleteIfExists(SESSION_FILE_PATH);
         session = new PlaySession();
         clearWatcher();
         startedPlaying = false;
