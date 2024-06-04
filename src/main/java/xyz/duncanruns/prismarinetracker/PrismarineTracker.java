@@ -91,7 +91,7 @@ public class PrismarineTracker {
                 .forEach(s -> {
                     try {
                         Files.move(TRACKER_DIR.resolve(s), SESSIONS_DIR.resolve(s));
-                        Julti.log(Level.INFO,"Session file "+s+" moved to new sessions folder.");
+                        Julti.log(Level.INFO, "Session file " + s + " moved to new sessions folder.");
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
