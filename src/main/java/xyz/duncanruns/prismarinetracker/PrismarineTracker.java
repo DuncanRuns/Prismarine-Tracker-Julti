@@ -147,7 +147,6 @@ public class PrismarineTracker {
 
     private static void processJsonFile(Path recordPath) throws IOException {
         JsonObject json = GSON.fromJson(FileUtil.readString(recordPath), JsonObject.class);
-        System.out.println("Processing " + recordPath);
         processJson(json);
     }
 

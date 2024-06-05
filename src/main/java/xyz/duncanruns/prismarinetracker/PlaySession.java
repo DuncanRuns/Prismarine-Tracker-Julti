@@ -68,7 +68,7 @@ public class PlaySession {
         cs.runsWithTrading = runsWithTrading;
         cs.runsWith10Pearls = runsWith10Pearls;
 
-        cs.runsWithNether = runsWithFort;
+        cs.runsWithNether = runsWithNether;
         cs.averageNetherMillis = FormattingUtil.getAverageTime(netherEnterTimes);
         cs.averageNetherFormatted = FormattingUtil.formatMillis(cs.averageNetherMillis);
 
