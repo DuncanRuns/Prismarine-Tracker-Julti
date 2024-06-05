@@ -118,7 +118,7 @@ public class PrismarineTrackerGUI extends JFrame {
         if (cs.runsWithNether > 0) {
             builder.append("\n\nNethers entered: ").append(cs.runsWithNether);
             if (cs.averageFortressMillis != 0) {
-                builder.append(" (Average Time: ").append(cs.averageFortressFormatted).append(")");
+                builder.append(" (Average Time: ").append(cs.averageNetherFormatted).append(")");
             }
         }
         if (cs.runsWithFortress > 0) {
