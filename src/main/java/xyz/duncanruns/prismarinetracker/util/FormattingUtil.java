@@ -10,7 +10,6 @@ public final class FormattingUtil {
 
     public static String formatDate(long millis) {
         Date date = new Date(millis);
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM d'th', yyyy, HH:mm");
 
         // Modify the day part to add appropriate suffix
         String dayWithSuffix = new SimpleDateFormat("d").format(date);

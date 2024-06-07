@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 public class PrismarineTracker {
@@ -27,12 +28,17 @@ public class PrismarineTracker {
     public static final Path SESSIONS_DIR = TRACKER_DIR.resolve("sessions");
     public static final Path OUTPUT_DIR = TRACKER_DIR.resolve("output");
     private static final Path SESSION_FILE_PATH = TRACKER_DIR.resolve("session.json");
+    public static final Path RUNS_DIR = TRACKER_DIR.resolve("runs");
     private static final Path RECORDS_FOLDER = Paths.get(System.getProperty("user.home")).resolve("speedrunigt").resolve("records");
     public static final Set<String> MANUAL_RESET_CODES = new HashSet<>(Arrays.asList("wallReset", "wallSingleReset", "wallFocusReset", "reset"));
     private static long lastTick = 0;
     private static boolean benchmarkWasRunning = false;
     private static boolean shouldSave = false;
     private static boolean startedPlaying = false;
+
+    private static int activeInstance;
+    private static long activeInstanceStart;
+    private static int last1MinuteInstance;
 
     /**
      * Returned object should not be modified.
@@ -154,6 +160,7 @@ public class PrismarineTracker {
         // If non-survival, cheats, or coop, or not random seed, don't track
         if (json.get("default_gamemode").getAsInt() != 0) return;
         if (!Objects.equals(json.get("run_type").getAsString(), "random_seed")) return;
+        if (!Objects.equals(json.get("mc_version").getAsString(), "1.15.2")) return;
         if (json.get("is_coop").getAsBoolean()) return;
 
         long openToLanTime = 0;
@@ -169,11 +176,6 @@ public class PrismarineTracker {
 
         if (startedPlaying) session.resets++;
 
-        if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
-            session.runsFinished++;
-            session.runFinishTimes.add(json.get("retimed_igt").getAsLong());
-        }
-
         Map<String, Long> timeLineEvents = new HashMap<>();
 
         for (JsonElement event : json.get("timelines").getAsJsonArray()) {
@@ -182,6 +184,13 @@ public class PrismarineTracker {
                 continue;
             }
             timeLineEvents.put(eventJson.get("name").getAsString(), eventJson.get("igt").getAsLong());
+        }
+
+        if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
+            session.runsFinished++;
+            session.runFinishTimes.add(json.get("retimed_igt").getAsLong());
+            tryMakeRunFile(json, timeLineEvents);
+            Julti.log(Level.INFO, "(Prismarine Tracker) Run Completed! Instance " + last1MinuteInstance + " world \"" + json.get("world_name").getAsString() + "\"");
         }
 
         countRunsWithStuffStats(timeLineEvents);
@@ -226,6 +235,55 @@ public class PrismarineTracker {
 
         if (!timeLineEvents.containsKey("nether_travel")) return;
         session.netherExitTimes.add(timeLineEvents.get("nether_travel"));
+    }
+
+    private static void tryMakeRunFile(JsonObject json, Map<String, Long> timeLineEvents) {
+        try {
+            makeRunFile(json, timeLineEvents);
+        } catch (Exception e) {
+            Julti.log(Level.ERROR, "Failed to make run file: " + ExceptionUtil.toDetailedString(e));
+        }
+    }
+
+    private static void makeRunFile(JsonObject json, Map<String, Long> timeLineEvents) throws IOException {
+        if (!Files.exists(RUNS_DIR)) {
+            Files.createDirectories(RUNS_DIR);
+        }
+
+        long date = json.get("date").getAsLong();
+        Path runPath = RUNS_DIR.resolve(date + ".json");
+        CompletedRun cr = new CompletedRun();
+
+        cr.date = date;
+        cr.mineMonument = timeLineEvents.getOrDefault("pick_gold_block", -1L);
+        cr.villageEnter = timeLineEvents.getOrDefault("found_villager", -1L);
+        cr.firstTrade = timeLineEvents.getOrDefault("trade_with_villager", -1L);
+        cr.netherEnter = timeLineEvents.getOrDefault("enter_nether", -1L);
+        cr.fortressEnter = timeLineEvents.getOrDefault("enter_fortress", -1L);
+        cr.netherExit = timeLineEvents.getOrDefault("nether_travel", -1L);
+        cr.strongholdEnter = timeLineEvents.getOrDefault("enter_stronghold", -1L);
+        cr.endEnter = timeLineEvents.getOrDefault("enter_end", -1L);
+
+        cr.completionIGT = json.get("final_igt").getAsLong();
+        cr.completionRTA = json.get("final_rta").getAsLong();
+        cr.completionRetime = json.get("retimed_igt").getAsLong();
+
+        FileUtil.writeString(runPath, GSON.toJson(cr));
+    }
+
+    public static void main(String[] args) throws IOException {
+        AtomicInteger i = new AtomicInteger();
+        Files.list(RECORDS_FOLDER).forEach(path -> {
+            if (i.incrementAndGet() == 1000) {
+                i.addAndGet(-1000);
+                System.out.println("1000 done...");
+            }
+            try {
+                processJsonFile(path);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     private static void countRunsWithPearlsStat(JsonObject json) {
@@ -284,6 +342,13 @@ public class PrismarineTracker {
         MinecraftInstance selectedInstance;
         if ((selectedInstance = InstanceManager.getInstanceManager().getSelectedInstance()) != null && "1.15.2".equals(selectedInstance.getVersionString())) {
             updateLastActivity();
+            int instanceNum = InstanceManager.getInstanceManager().getInstanceNum(selectedInstance);
+            if (activeInstance != instanceNum) {
+                activeInstance = instanceNum;
+                activeInstanceStart = System.currentTimeMillis();
+            } else if (System.currentTimeMillis() - activeInstanceStart > 60_000) {
+                last1MinuteInstance = instanceNum;
+            }
         }
 
         WatchKey watchKey = recordsWatcher.poll();

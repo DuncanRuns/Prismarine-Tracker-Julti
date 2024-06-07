@@ -6,13 +6,15 @@ import xyz.duncanruns.julti.cancelrequester.CancelRequester;
 import xyz.duncanruns.julti.command.Command;
 import xyz.duncanruns.julti.command.CommandFailedException;
 import xyz.duncanruns.prismarinetracker.PrismarineTracker;
+import xyz.duncanruns.prismarinetracker.gui.PrismarineTrackerGUI;
 
 import java.io.IOException;
 
 public class PrismarineTrackerCommand extends Command {
     @Override
     public String helpDescription() {
-        return "pris clear - Clears the current session of any stats, useful for after a warmup script";
+        return "pris clear - Clears the current session of any stats, useful for after a warmup script" +
+                "\npris show - Opens the Prismarine Tracker GUI";
     }
 
     @Override
@@ -42,6 +44,8 @@ public class PrismarineTrackerCommand extends Command {
             } catch (IOException e) {
                 throw new CommandFailedException(e);
             }
+        } else if ("show".equals(command)) {
+            PrismarineTrackerGUI.open();
         } else {
             throw new CommandFailedException("Invalid argument for pris command");
         }
