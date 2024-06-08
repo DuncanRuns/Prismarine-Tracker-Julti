@@ -51,31 +51,8 @@ public class PrismarineTrackerGUI extends JFrame {
     }
 
     public PrismarineTrackerGUI() {
-        Pattern numberPattern = Pattern.compile("\\d+");
-        try {
-            List<Long> sessionLongs = Files.list(PrismarineTracker.SESSIONS_DIR)
-                    .map(Path::getFileName)
-                    .map(Object::toString)
-                    .filter(s -> s.endsWith(".json"))
-                    .map(s -> s.substring(0, s.length() - 5))
-                    .filter(s -> numberPattern.matcher(s).matches())
-                    .map(Long::parseLong)
-                    .sorted()
-                    .collect(Collectors.toList());
-            allSessions.addAll(sessionLongs);
-            List<Long> runLongs = Files.list(PrismarineTracker.RUNS_DIR)
-                    .map(Path::getFileName)
-                    .map(Object::toString)
-                    .filter(s -> s.endsWith(".json"))
-                    .map(s -> s.substring(0, s.length() - 5))
-                    .filter(s -> numberPattern.matcher(s).matches())
-                    .map(Long::parseLong)
-                    .sorted()
-                    .collect(Collectors.toList());
-            allRuns.addAll(runLongs);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        retrieveSessions();
+        retrieveRuns();
         showCurrentSession();
         nextButton.addActionListener(a -> onNextButtonPress());
         previousButton.addActionListener(a -> onPreviousButtonPress());
@@ -197,6 +174,48 @@ public class PrismarineTrackerGUI extends JFrame {
 
     private static long getCurrentSessionStartTime() {
         return PrismarineTracker.getCurrentSession().sessionStartTime;
+    }
+
+    private void retrieveRuns() {
+        if (!Files.exists(PrismarineTracker.RUNS_DIR)) {
+            return;
+        }
+        Pattern numberPattern = Pattern.compile("\\d+");
+        try {
+            List<Long> runLongs = Files.list(PrismarineTracker.RUNS_DIR)
+                    .map(Path::getFileName)
+                    .map(Object::toString)
+                    .filter(s -> s.endsWith(".json"))
+                    .map(s -> s.substring(0, s.length() - 5))
+                    .filter(s -> numberPattern.matcher(s).matches())
+                    .map(Long::parseLong)
+                    .sorted()
+                    .collect(Collectors.toList());
+            allRuns.addAll(runLongs);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void retrieveSessions() {
+        if (!Files.exists(PrismarineTracker.SESSIONS_DIR)) {
+            return;
+        }
+        Pattern numberPattern = Pattern.compile("\\d+");
+        try {
+            List<Long> sessionLongs = Files.list(PrismarineTracker.SESSIONS_DIR)
+                    .map(Path::getFileName)
+                    .map(Object::toString)
+                    .filter(s -> s.endsWith(".json"))
+                    .map(s -> s.substring(0, s.length() - 5))
+                    .filter(s -> numberPattern.matcher(s).matches())
+                    .map(Long::parseLong)
+                    .sorted()
+                    .collect(Collectors.toList());
+            allSessions.addAll(sessionLongs);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void onShowTypeButtonPress() {
