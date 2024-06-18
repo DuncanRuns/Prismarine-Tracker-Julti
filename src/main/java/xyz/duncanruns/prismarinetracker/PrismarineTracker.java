@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 public class PrismarineTracker {
@@ -39,6 +38,9 @@ public class PrismarineTracker {
     private static int activeInstance;
     private static long activeInstanceStart;
     private static int last1MinuteInstance;
+
+    private static long timeMin = Long.MAX_VALUE;
+    private static long timeMax = 0;
 
     /**
      * Returned object should not be modified.
@@ -92,7 +94,6 @@ public class PrismarineTracker {
             String hotkeyCode = ((Pair<String, Point>) o).getLeft();
             if (MANUAL_RESET_CODES.contains(hotkeyCode)) {
                 startedPlaying = true;
-                updateLastActivity();
             }
         });
     }
@@ -163,10 +164,10 @@ public class PrismarineTracker {
         if (!Objects.equals(json.get("mc_version").getAsString(), "1.15.2")) return;
         if (json.get("is_coop").getAsBoolean()) return;
 
-        long date = 0;
-        if (json.has("date")) {
-            date = json.get("date").getAsLong();
-        }
+        long finalRta = json.get("final_rta").getAsLong();
+        long date = System.currentTimeMillis() - finalRta; // better than record's date, that shit sucks!
+        updateActionTimes(finalRta, date);
+
         long openToLanTime = 0;
         boolean hasOpenedToLan = false;
         try {
@@ -190,11 +191,11 @@ public class PrismarineTracker {
             if (hasOpenedToLan && rta > openToLanTime) {
                 continue;
             }
-            PrismarineLogger.queueLog(date + rta, name);
+            PrismarineLogger.queueLog(date + rta, name + " " + rta + " " + igt);
             timeLineEvents.put(name, igt);
         }
 
-        if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
+        if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > finalRta))) {
             session.runsFinished++;
             session.runFinishTimes.add(json.get("retimed_igt").getAsLong());
             tryMakeRunFile(json, timeLineEvents);
@@ -245,6 +246,16 @@ public class PrismarineTracker {
         session.netherExitTimes.add(timeLineEvents.get("nether_travel"));
     }
 
+    private static void updateActionTimes(long finalRta, long date) {
+        if (finalRta == 0) {
+            timeMin = Math.min(date, timeMin);
+            timeMax = Math.max(date, timeMax);
+        } else {
+            timeMin = Math.min(date, timeMin);
+            timeMax = Math.max(date + finalRta, timeMax);
+        }
+    }
+
     private static void tryMakeRunFile(JsonObject json, Map<String, Long> timeLineEvents) {
         try {
             makeRunFile(json, timeLineEvents);
@@ -277,21 +288,6 @@ public class PrismarineTracker {
         cr.completionRetime = json.get("retimed_igt").getAsLong();
 
         FileUtil.writeString(runPath, GSON.toJson(cr));
-    }
-
-    public static void main(String[] args) throws IOException {
-        AtomicInteger i = new AtomicInteger();
-        Files.list(RECORDS_FOLDER).forEach(path -> {
-            if (i.incrementAndGet() == 1000) {
-                i.addAndGet(-1000);
-                System.out.println("1000 done...");
-            }
-            try {
-                processJsonFile(path);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
     }
 
     private static void countRunsWithPearlsStat(JsonObject json) {
@@ -334,7 +330,7 @@ public class PrismarineTracker {
     }
 
     private static void tick() {
-        if (System.currentTimeMillis() - lastTick > 5000) {
+        if (System.currentTimeMillis() - lastTick > 500) {
             lastTick = System.currentTimeMillis();
         } else {
             return;
@@ -349,7 +345,6 @@ public class PrismarineTracker {
 
         MinecraftInstance selectedInstance;
         if ((selectedInstance = InstanceManager.getInstanceManager().getSelectedInstance()) != null && "1.15.2".equals(selectedInstance.getVersionString())) {
-            updateLastActivity();
             int instanceNum = InstanceManager.getInstanceManager().getInstanceNum(selectedInstance);
             if (activeInstance != instanceNum) {
                 activeInstance = instanceNum;
@@ -358,6 +353,9 @@ public class PrismarineTracker {
                 last1MinuteInstance = instanceNum;
             }
         }
+
+        timeMin = Long.MAX_VALUE;
+        timeMax = 0;
 
         WatchKey watchKey = recordsWatcher.poll();
         if (watchKey == null)
@@ -379,6 +377,10 @@ public class PrismarineTracker {
             Julti.log(Level.ERROR, "Failed to save log: " + ExceptionUtil.toDetailedString(e));
         }
 
+        if (timeMax != 0 && timeMin != Long.MAX_VALUE) {
+            updateLastActivity();
+        }
+
         if (shouldSave) {
             shouldSave = false;
             trySave();
@@ -394,12 +396,12 @@ public class PrismarineTracker {
 
     private static synchronized void updateLastActivity() {
         if (!startedPlaying) return;
-        long currentTime = System.currentTimeMillis();
-        long timeSinceLastActivity = Math.abs(currentTime - session.lastActivity);
+        long timeSinceLastActivity = timeMin - session.lastActivity;
         if (timeSinceLastActivity > 120_000 /*2 Minutes*/) {
             session.breaks.add(timeSinceLastActivity);
+            PrismarineLogger.queueLog(System.currentTimeMillis(), "finish_break " + timeSinceLastActivity);
         }
-        session.lastActivity = currentTime;
+        session.lastActivity = timeMax;
     }
 
     public static void clearSession() throws IOException {
