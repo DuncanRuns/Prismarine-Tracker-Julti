@@ -163,6 +163,10 @@ public class PrismarineTracker {
         if (!Objects.equals(json.get("mc_version").getAsString(), "1.15.2")) return;
         if (json.get("is_coop").getAsBoolean()) return;
 
+        long date = 0;
+        if (json.has("date")) {
+            date = json.get("date").getAsLong();
+        }
         long openToLanTime = 0;
         boolean hasOpenedToLan = false;
         try {
@@ -180,10 +184,14 @@ public class PrismarineTracker {
 
         for (JsonElement event : json.get("timelines").getAsJsonArray()) {
             JsonObject eventJson = event.getAsJsonObject();
-            if (hasOpenedToLan && eventJson.get("rta").getAsLong() > openToLanTime) {
+            String name = eventJson.get("name").getAsString();
+            long rta = eventJson.get("rta").getAsLong();
+            long igt = eventJson.get("igt").getAsLong();
+            if (hasOpenedToLan && rta > openToLanTime) {
                 continue;
             }
-            timeLineEvents.put(eventJson.get("name").getAsString(), eventJson.get("igt").getAsLong());
+            PrismarineLogger.queueLog(date + rta, name);
+            timeLineEvents.put(name, igt);
         }
 
         if (json.get("is_completed").getAsBoolean() && (!hasOpenedToLan || (openToLanTime > json.get("final_rta").getAsLong()))) {
@@ -365,6 +373,11 @@ public class PrismarineTracker {
             }
         }
         watchKey.reset();
+        try {
+            PrismarineLogger.flushLog();
+        } catch (IOException e) {
+            Julti.log(Level.ERROR, "Failed to save log: " + ExceptionUtil.toDetailedString(e));
+        }
 
         if (shouldSave) {
             shouldSave = false;
