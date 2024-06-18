@@ -41,11 +41,4 @@ public class PrismarineLogger {
         }
         file.writeBytes(msg + "\n");
     }
-
-    public static void main(String[] args) throws IOException {
-        queueLog(3, "pick_gold_block");
-        queueLog(1, "beat_dragon");
-        queueLog(2, "mario");
-        flushLog();
-    }
 }
