@@ -114,7 +114,7 @@ public class PrismarineTracker {
     }
 
     public static void stop() {
-        tick();
+        tickInternal();
         if (session.runsWithGold > 0) {
             trySave();
         }
@@ -335,7 +335,10 @@ public class PrismarineTracker {
         } else {
             return;
         }
+        new Thread(PrismarineTracker::tickInternal, "prismarine-tracker-tick").start();
+    }
 
+    private static synchronized void tickInternal() {
         boolean benchmarkIsRunning = JultiOptions.getJultiOptions().resetStyle.equals("Benchmark");
         if (benchmarkIsRunning || benchmarkWasRunning) {
             clearWatcher();
